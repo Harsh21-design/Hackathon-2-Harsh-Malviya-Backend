@@ -165,9 +165,13 @@ async def send_reminder(
     if stage is None:
         raise HTTPException(400, "Cannot determine reminder stage from draft.")
 
-    # Acquire advisory lock to prevent concurrent sends (Rule 12)
-    lock_key = abs(hash(invoice_id)) % (2**31)
-    await db.execute(text(f"SELECT pg_advisory_xact_lock({lock_key})"))
+    # Acquire advisory lock to prevent concurrent sends (Rule 12) if on PostgreSQL
+    try:
+        lock_key = abs(hash(invoice_id)) % (2**31)
+        await db.execute(text(f"SELECT pg_advisory_xact_lock({lock_key})"))
+    except Exception:
+        # SQLite or non-Postgres DB does not support pg advisory locks
+        pass
 
     # Reload attempts after acquiring lock
     attempts_r = await db.execute(

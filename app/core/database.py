@@ -4,13 +4,22 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(
-    settings.SUPABASE_DB_URL,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
-)
+db_url = settings.SUPABASE_DB_URL
+if not db_url:
+    # Local dev fallback
+    db_url = "sqlite+aiosqlite:///./payment_recovery.db"
+
+is_sqlite = db_url.startswith("sqlite")
+
+engine_kwargs = {"echo": False}
+if not is_sqlite:
+    engine_kwargs.update({
+        "pool_pre_ping": True,
+        "pool_size": 5,
+        "max_overflow": 10,
+    })
+
+engine = create_async_engine(db_url, **engine_kwargs)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

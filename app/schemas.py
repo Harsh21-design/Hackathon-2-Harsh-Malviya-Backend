@@ -9,12 +9,20 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, Literal, Any
 
-from pydantic import BaseModel, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator, field_serializer
 
 
 # ── Shared ────────────────────────────────────────────────────────────────────
 
-class OkResponse(BaseModel):
+class BaseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True, coerce_numbers_to_str=True)
+
+    @field_serializer("id", "client_id", "invoice_id", "incoming_message_id", "owner_id", "source_message_id", check_fields=False)
+    def serialize_uuid(self, v: Any) -> Optional[str]:
+        return str(v) if v is not None else None
+
+
+class OkResponse(BaseSchema):
     ok: bool = True
     message: str = "Success"
 
@@ -36,7 +44,7 @@ class BusinessProfileUpdate(BaseModel):
 
 
 class BusinessProfileOut(BaseModel):
-    id: str
+    id: uuid.UUID | str
     name: str
     email: str
     company: Optional[str]
@@ -65,7 +73,7 @@ class ClientUpdate(BaseModel):
 
 
 class ClientOut(BaseModel):
-    id: str
+    id: uuid.UUID | str
     name: str
     email: str
     company: Optional[str]
@@ -94,7 +102,7 @@ INVOICE_STATUSES = Literal[
 
 
 class InvoiceCreate(BaseModel):
-    client_id: str
+    client_id: uuid.UUID | str
     invoice_number: str
     amount: Decimal
     currency: str = "USD"
@@ -126,8 +134,8 @@ class InvoiceUpdate(BaseModel):
 
 
 class InvoiceOut(BaseModel):
-    id: str
-    client_id: str
+    id: uuid.UUID | str
+    client_id: uuid.UUID | str
     invoice_number: str
     amount: Decimal
     currency: str
@@ -159,25 +167,25 @@ class ReminderDraftRequest(BaseModel):
 
 
 class ReminderDraftOut(BaseModel):
-    draft_id: str
+    draft_id: uuid.UUID | str
     stage: int
     subject: str
     body: str
-    invoice_id: str
+    invoice_id: uuid.UUID | str
     client_name: str
     client_email: str
     is_demo: bool = False
 
 
 class ReminderSendRequest(BaseModel):
-    draft_id: str
+    draft_id: uuid.UUID | str
     subject: str   # user may have edited it
     body: str      # user may have edited it
 
 
 class ReminderAttemptOut(BaseModel):
-    id: str
-    invoice_id: str
+    id: uuid.UUID | str
+    invoice_id: uuid.UUID | str
     stage: int
     status: str
     resend_message_id: Optional[str]
@@ -205,14 +213,14 @@ class EligibilityOut(BaseModel):
 
 class SimulateReplyRequest(BaseModel):
     """For demo mode: manually submit a client reply text for classification."""
-    invoice_id: str
+    invoice_id: uuid.UUID | str
     from_email: str
     subject: Optional[str] = None
     body_text: str
 
 
 class IncomingMessageOut(BaseModel):
-    id: str
+    id: uuid.UUID | str
     invoice_id: Optional[str]
     client_id: Optional[str]
     from_email: str
@@ -243,8 +251,8 @@ class AIClassificationResult(BaseModel):
 
 
 class ReplyClassificationOut(BaseModel):
-    id: str
-    incoming_message_id: str
+    id: uuid.UUID | str
+    incoming_message_id: uuid.UUID | str
     invoice_id: Optional[str]
     label: str
     promised_date: Optional[date]
@@ -289,8 +297,8 @@ class PaymentPromiseCreate(BaseModel):
 
 
 class PaymentPromiseOut(BaseModel):
-    id: str
-    invoice_id: str
+    id: uuid.UUID | str
+    invoice_id: uuid.UUID | str
     promised_date: date
     status: str
     created_at: datetime
@@ -301,8 +309,8 @@ class PaymentPromiseOut(BaseModel):
 # ── Payment Review ────────────────────────────────────────────────────────────
 
 class PaymentReviewOut(BaseModel):
-    id: str
-    invoice_id: str
+    id: uuid.UUID | str
+    invoice_id: uuid.UUID | str
     review_type: str
     status: str
     notes: Optional[str]
@@ -319,7 +327,7 @@ class ResolveReviewRequest(BaseModel):
 # ── Activity Log ──────────────────────────────────────────────────────────────
 
 class ActivityLogOut(BaseModel):
-    id: str
+    id: uuid.UUID | str
     invoice_id: Optional[str]
     client_id: Optional[str]
     event_type: str
@@ -334,7 +342,7 @@ class ActivityLogOut(BaseModel):
 
 class ActionItem(BaseModel):
     type: str   # SEND_REMINDER | REVIEW_PROMISE | REVIEW_DISPUTE | REVIEW_REPLY | REVIEW_CLAIM
-    invoice_id: str
+    invoice_id: uuid.UUID | str
     invoice_number: str
     client_name: str
     amount: Decimal

@@ -31,7 +31,7 @@ async def log_event(
             description=description,
             invoice_id=uuid.UUID(invoice_id) if invoice_id else None,
             client_id=uuid.UUID(client_id) if client_id else None,
-            metadata=metadata,
+            event_metadata=metadata,
         )
         db.add(entry)
         await db.flush()
