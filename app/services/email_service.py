@@ -49,16 +49,18 @@ def send_reminder_email(
         # Convert plain text body to simple HTML
         html_body = body.replace("\n", "<br>")
 
-        params = resend.Emails.SendParams(
-            from_=settings.RESEND_FROM_EMAIL,
-            to=[to_email],
-            subject=subject,
-            html=f"<div style='font-family: Arial, sans-serif; max-width: 600px;'>{html_body}</div>",
-            reply_to=reply_to,
-        )
+        from_email = settings.RESEND_FROM_EMAIL or "onboarding@resend.dev"
+
+        params = {
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "html": f"<div style='font-family: Arial, sans-serif; max-width: 600px;'>{html_body}</div>",
+            "reply_to": reply_to,
+        }
 
         response = resend.Emails.send(params)
-        message_id = getattr(response, "id", None) or str(response)
+        message_id = response.get("id") if isinstance(response, dict) else (getattr(response, "id", None) or str(response))
 
         return {"success": True, "message_id": message_id, "demo": False}
 
