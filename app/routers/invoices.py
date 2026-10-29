@@ -87,15 +87,38 @@ async def create_invoice(
 ):
     user_id = get_current_user_id(payload)
 
-    # Verify client belongs to owner
-    client_result = await db.execute(
-        select(Client).where(
-            Client.id == uuid.UUID(data.client_id),
-            Client.owner_id == uuid.UUID(user_id),
+    # Resolve or create Client
+    client_obj: Optional[Client] = None
+    if data.client_id:
+        client_result = await db.execute(
+            select(Client).where(
+                Client.id == uuid.UUID(str(data.client_id)),
+                Client.owner_id == uuid.UUID(user_id),
+            )
         )
-    )
-    if not client_result.scalar_one_or_none():
-        raise HTTPException(404, "Client not found.")
+        client_obj = client_result.scalar_one_or_none()
+    elif data.client_email:
+        # Match by email for this owner
+        client_result = await db.execute(
+            select(Client).where(
+                Client.email == data.client_email.lower(),
+                Client.owner_id == uuid.UUID(user_id),
+            )
+        )
+        client_obj = client_result.scalar_one_or_none()
+        if not client_obj:
+            # Create new client automatically with provided name/email
+            client_obj = Client(
+                id=uuid.uuid4(),
+                owner_id=uuid.UUID(user_id),
+                name=data.client_name or data.client_email.split("@")[0].title(),
+                email=data.client_email.lower(),
+            )
+            db.add(client_obj)
+            await db.flush()
+
+    if not client_obj:
+        raise HTTPException(400, "Please provide client_id or client_name and client_email.")
 
     # Check duplicate invoice number for this owner
     dup = await db.execute(
@@ -108,8 +131,9 @@ async def create_invoice(
         raise HTTPException(409, f"Invoice number '{data.invoice_number}' already exists.")
 
     inv = Invoice(
+        id=uuid.uuid4(),
         owner_id=uuid.UUID(user_id),
-        client_id=uuid.UUID(data.client_id),
+        client_id=client_obj.id,
         invoice_number=data.invoice_number,
         amount=data.amount,
         currency=data.currency,
@@ -122,8 +146,8 @@ async def create_invoice(
     await db.flush()
     await log_event(
         db, user_id, "INVOICE_CREATED",
-        f"Invoice {inv.invoice_number} created for {data.amount} {data.currency}.",
-        invoice_id=str(inv.id), client_id=data.client_id,
+        f"Invoice {inv.invoice_number} created for {data.amount} {data.currency} ({client_obj.name} - {client_obj.email}).",
+        invoice_id=str(inv.id), client_id=str(client_obj.id),
         metadata={"amount": str(data.amount), "due_date": str(data.due_date)},
     )
     await db.commit()

@@ -17,6 +17,10 @@ if not is_sqlite:
         "pool_pre_ping": True,
         "pool_size": 5,
         "max_overflow": 10,
+        "connect_args": {
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+        },
     })
 
 engine = create_async_engine(db_url, **engine_kwargs)

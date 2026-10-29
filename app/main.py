@@ -13,7 +13,7 @@ from app.core.config import get_settings
 from app.core.database import engine, Base
 import app.models  # Ensure all models are registered with Base.metadata
 
-from app.routers import invoices, clients, reminders, profile
+from app.routers import invoices, clients, reminders, profile, activities
 
 # Configure logging
 logging.basicConfig(
@@ -63,6 +63,7 @@ app.include_router(invoices.router)
 app.include_router(clients.router)
 app.include_router(reminders.router)
 app.include_router(profile.router)
+app.include_router(activities.router)
 
 
 @app.get("/health", tags=["Health"])

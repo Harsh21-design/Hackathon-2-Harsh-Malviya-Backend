@@ -102,7 +102,9 @@ INVOICE_STATUSES = Literal[
 
 
 class InvoiceCreate(BaseModel):
-    client_id: uuid.UUID | str
+    client_id: Optional[uuid.UUID | str] = None
+    client_name: Optional[str] = None
+    client_email: Optional[EmailStr] = None
     invoice_number: str
     amount: Decimal
     currency: str = "USD"
