@@ -143,26 +143,25 @@ Classify this reply and respond with the JSON schema described in the system pro
 
 # ── Reminder Drafting ─────────────────────────────────────────────────────────
 
-REMINDER_SYSTEM = """You are a professional payment reminder assistant for a small business owner.
-Your task is to draft a concise, polite, and professional payment reminder email.
+REMINDER_SYSTEM = """You are a professional payment recovery assistant for a freelancer/business owner.
+Your task is to draft a CRISP, CONCISE, and POLITE payment reminder email.
 
-Critical rules:
-1. Use ONLY the facts provided. Do NOT invent payment history, promises, penalties, legal consequences, payment methods, or deadlines not mentioned.
-2. Do NOT threaten the client.
-3. Keep the email professional, brief, and clear.
-4. The subject line should be specific and reference the invoice number.
-5. The body should be 3-5 short paragraphs maximum.
+CRITICAL INSTRUCTIONS:
+1. KEEP IT VERY BRIEF: Exactly 2 to 3 short paragraphs maximum (under 90 words total). NEVER write a long essay or lengthy email.
+2. Directly acknowledge any prior client response/note concisely if provided.
+3. Include the invoice number, amount, and due date clearly.
+4. Tone must be professional, warm, and collaborative.
 
-Respond with a JSON object:
+Respond ONLY with a valid JSON object:
 {
-  "subject": "email subject line",
-  "body": "full email body as plain text with \\n for line breaks"
+  "subject": "Clear concise subject line",
+  "body": "Concise plain text email body with \\n for line breaks"
 }"""
 
 STAGE_INSTRUCTIONS = {
-    1: "This is the FIRST reminder (R1). Tone: polite, warm, assumes the invoice may have been overlooked or delayed. Do not assume bad intent. Suggest the client check the invoice details.",
-    2: "This is the SECOND reminder (R2). Tone: professional and slightly more direct. Acknowledge that a previous reminder was sent. Express hope that the matter can be resolved promptly.",
-    3: "This is the THIRD and FINAL reminder (R3). Tone: firm, clear, professional. State clearly that this is the final reminder. Request immediate payment or a response explaining the situation. Do NOT invent legal threats or penalty amounts.",
+    1: "Stage 1 (Gentle): Short and polite reminder that the invoice reached its due date. Assume it might have been overlooked.",
+    2: "Stage 2 (Firm Follow-up): Short follow-up acknowledging the previous note/delay. Request confirmation of the payment status.",
+    3: "Stage 3 (Final Notice): Short, firm final follow-up requesting urgent payment or a direct update today.",
 }
 
 
@@ -173,10 +172,10 @@ def draft_reminder(
     business_name: str,
     prior_reminders: list[ReminderAttempt],
     prior_communication_summary: Optional[str] = None,
-) -> Optional[dict[str, str]]:
+) -> dict[str, str]:
     """
-    Generate an AI reminder email draft.
-    Returns dict with 'subject' and 'body', or None on failure.
+    Generate a concise AI reminder email draft using direct Google REST API
+    (fast, reliable, and immune to SDK gRPC hanging).
     """
     if not settings.GEMINI_API_KEY:
         return _fallback_draft(invoice, client, stage, business_name)
@@ -184,66 +183,60 @@ def draft_reminder(
     today = date.today()
     overdue_days = (today - invoice.due_date).days if invoice.due_date < today else 0
 
-    prior_summary = ""
-    if prior_reminders:
-        prior_lines = [
-            f"  - R{r.stage} sent on {r.sent_at.strftime('%B %d, %Y') if r.sent_at else 'unknown date'}"
-            for r in prior_reminders if r.status == "SENT"
-        ]
-        prior_summary = "Prior reminders sent:\n" + "\n".join(prior_lines)
-
     comm_note = ""
     if prior_communication_summary:
-        comm_note = f"\nRelevant prior client communication:\n{prior_communication_summary}"
+        comm_note = f"\nClient's recent note: {prior_communication_summary}"
 
-    user_prompt = f"""Business owner information:
-- Business name: {business_name}
+    user_prompt = f"""Sender: {business_name}
+Client: {client.name} ({client.email})
+Invoice: #{invoice.invoice_number}
+Amount: {invoice.currency} {invoice.amount}
+Due Date: {invoice.due_date} ({overdue_days} days overdue)
+{comm_note}
 
-Invoice details:
-- Client name: {client.name}
-- Client email: {client.email}
-- Invoice number: {invoice.invoice_number}
-- Invoice amount: {invoice.currency} {invoice.amount}
-- Invoice date: {invoice.invoice_date}
-- Due date: {invoice.due_date}
-- Days overdue: {overdue_days}
-- Today's date: {today}
+Stage: {STAGE_INSTRUCTIONS.get(stage, STAGE_INSTRUCTIONS[1])}
 
-{prior_summary}{comm_note}
-
-Reminder stage instruction:
-{STAGE_INSTRUCTIONS.get(stage, STAGE_INSTRUCTIONS[1])}
-
-Draft the reminder email now."""
+Draft a very short (2-3 sentences max) email draft now."""
 
     try:
-        model = _get_model()
-        response = model.generate_content(
-            contents=[
-                {"role": "user", "parts": [REMINDER_SYSTEM + "\n\n" + user_prompt]}
+        import requests
+        model_name = settings.GEMINI_MODEL or "gemini-3.5-flash-lite"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
+        
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": f"{REMINDER_SYSTEM}\n\n{user_prompt}"}
+                    ]
+                }
             ],
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                temperature=0.4,
-            ),
-        )
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "temperature": 0.3,
+                "maxOutputTokens": 300,
+            }
+        }
+        
+        resp = requests.post(url, json=payload, timeout=6)
+        if resp.status_code == 200:
+            data_json = resp.json()
+            raw_text = data_json["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if raw_text.startswith("```"):
+                raw_text = raw_text.split("```")[1]
+                if raw_text.startswith("json"):
+                    raw_text = raw_text[4:]
+                raw_text = raw_text.strip()
+            
+            parsed = json.loads(raw_text)
+            if "subject" in parsed and "body" in parsed:
+                return {"subject": parsed["subject"], "body": parsed["body"]}
 
-        raw_text = response.text.strip()
-        if raw_text.startswith("```"):
-            raw_text = raw_text.split("```")[1]
-            if raw_text.startswith("json"):
-                raw_text = raw_text[4:]
-            raw_text = raw_text.strip()
-
-        data = json.loads(raw_text)
-        if "subject" in data and "body" in data:
-            return {"subject": data["subject"], "body": data["body"]}
-
-        logger.error("Gemini draft missing subject or body keys: %s", data)
+        logger.warning("Gemini REST API non-200: %s %s", resp.status_code, resp.text)
         return _fallback_draft(invoice, client, stage, business_name)
 
     except Exception as e:
-        logger.error("Gemini draft error: %s", e)
+        logger.error("Gemini draft exception: %s", e)
         return _fallback_draft(invoice, client, stage, business_name)
 
 
