@@ -6,8 +6,8 @@ from app.core.config import get_settings
 settings = get_settings()
 security = HTTPBearer(auto_error=False)
 
-# Fixed UUID for local development / demo mode
-DEMO_USER_ID = "00000000-0000-0000-0000-000000000001"
+# Owner UUID matching the seeded database business profile
+DEMO_USER_ID = "ea67ed04-2dc0-4acc-ad8e-e323e3078065"
 
 
 def verify_jwt(credentials: HTTPAuthorizationCredentials | None = Security(security)) -> dict:
