@@ -13,7 +13,7 @@ from app.core.config import get_settings
 from app.core.database import engine, Base
 import app.models  # Ensure all models are registered with Base.metadata
 
-from app.routers import invoices, clients, reminders, profile, activities
+from app.routers import invoices, clients, reminders, profile, activities, webhooks
 
 # Configure logging
 logging.basicConfig(
@@ -50,6 +50,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         settings.FRONTEND_URL,
+        "https://hackathon-2-harsh-malviya-frontend.vercel.app",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ],
@@ -64,6 +65,7 @@ app.include_router(clients.router)
 app.include_router(reminders.router)
 app.include_router(profile.router)
 app.include_router(activities.router)
+app.include_router(webhooks.router)
 
 
 @app.get("/health", tags=["Health"])

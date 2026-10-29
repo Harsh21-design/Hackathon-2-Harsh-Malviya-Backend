@@ -172,6 +172,49 @@ async def seed():
         await session.flush()
         print(f"Ensured {len(created_invoices)} invoices.")
 
+        # Seed matching ReminderAttempt records so backend check_eligibility matches reminder_count
+        now = datetime.now(timezone.utc)
+        # INV-103: R1 was sent
+        session.add(ReminderAttempt(
+            invoice_id=created_invoices[0].id,
+            owner_id=user_uuid,
+            stage=1,
+            status="SENT",
+            subject="Friendly Reminder: Invoice INV-103",
+            body="Hi Riley, checking in on invoice INV-103.",
+            sent_at=now - timedelta(days=2),
+        ))
+        # INV-105: R1 and R2 were sent
+        session.add(ReminderAttempt(
+            invoice_id=created_invoices[1].id,
+            owner_id=user_uuid,
+            stage=1,
+            status="SENT",
+            subject="Friendly Reminder: Invoice INV-105",
+            body="Hi Jamie, friendly reminder regarding invoice INV-105.",
+            sent_at=now - timedelta(days=5),
+        ))
+        session.add(ReminderAttempt(
+            invoice_id=created_invoices[1].id,
+            owner_id=user_uuid,
+            stage=2,
+            status="SENT",
+            subject="Follow-up: Invoice INV-105",
+            body="Hi Jamie, following up on our previous note for invoice INV-105.",
+            sent_at=now - timedelta(days=2),
+        ))
+        # INV-108: R1 was sent
+        session.add(ReminderAttempt(
+            invoice_id=created_invoices[2].id,
+            owner_id=user_uuid,
+            stage=1,
+            status="SENT",
+            subject="Friendly Reminder: Invoice INV-108",
+            body="Hi Avery, checking in on invoice INV-108.",
+            sent_at=now - timedelta(days=2),
+        ))
+        await session.flush()
+
         # 4. Activity Logs with Clean foreign keys
         now = datetime.now(timezone.utc)
         activities_data = [
