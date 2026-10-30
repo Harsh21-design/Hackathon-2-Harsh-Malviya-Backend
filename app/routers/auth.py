@@ -149,3 +149,4 @@ async def signup(req: SignupRequest, db: AsyncSession = Depends(get_db)):
         company=new_profile.company or clean_company,
         address=new_profile.address,
     )
+
