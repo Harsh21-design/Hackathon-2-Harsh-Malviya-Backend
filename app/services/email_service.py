@@ -23,6 +23,7 @@ def send_reminder_email(
     body: str,
     invoice_id: str,
     demo_mode: bool = False,
+    reply_to_email: Optional[str] = None,
 ) -> dict:
     """
     Send a reminder email via Resend.
@@ -40,10 +41,11 @@ def send_reminder_email(
     try:
         resend.api_key = settings.RESEND_API_KEY
 
+        # Dynamic reply-to: client replies directly to the authenticated freelancer's profile email
         reply_to = (
-            f"reply+{invoice_id}@{settings.RESEND_REPLY_TO_DOMAIN}"
-            if settings.RESEND_REPLY_TO_DOMAIN
-            else settings.RESEND_FROM_EMAIL
+            reply_to_email
+            or (f"reply+{invoice_id}@{settings.RESEND_REPLY_TO_DOMAIN}" if settings.RESEND_REPLY_TO_DOMAIN else None)
+            or settings.RESEND_FROM_EMAIL
         )
 
         # Convert plain text body to simple HTML

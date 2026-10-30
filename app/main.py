@@ -13,7 +13,7 @@ from app.core.config import get_settings
 from app.core.database import engine, Base
 import app.models  # Ensure all models are registered with Base.metadata
 
-from app.routers import invoices, clients, reminders, profile, activities, webhooks
+from app.routers import invoices, clients, reminders, profile, activities, webhooks, auth
 
 # Configure logging
 logging.basicConfig(
@@ -55,6 +55,7 @@ app.add_middleware(
 )
 
 # Register Routers
+app.include_router(auth.router)
 app.include_router(invoices.router)
 app.include_router(clients.router)
 app.include_router(reminders.router)

@@ -185,6 +185,12 @@ async def send_reminder(
 
     is_demo = settings.DEMO_MODE or not settings.RESEND_API_KEY
 
+    # Fetch owner profile email dynamically for Reply-To
+    profile_res = await db.execute(
+        select(BusinessProfile.email).where(BusinessProfile.id == uuid.UUID(user_id))
+    )
+    owner_email = profile_res.scalar_one_or_none() or payload.get("email") or settings.RESEND_FROM_EMAIL
+
     # Send email (Rule 16: only write SENT on confirmed delivery)
     send_result = send_reminder_email(
         to_email=client.email,
@@ -192,6 +198,7 @@ async def send_reminder(
         body=req.body,
         invoice_id=invoice_id,
         demo_mode=is_demo,
+        reply_to_email=owner_email,
     )
 
     # Update the DRAFT_ONLY attempt to reflect the result
